@@ -1,28 +1,31 @@
-REMIX DEFAULT WORKSPACE
+1. Створіть контракт, який матиме змінну-лічильник. Додайте функції для:
+   - Збільшення лічильника.
+   - Зменшення лічильника.
+   - Отримання поточного значення лічильника.
 
-Remix default workspace is present when:
-i. Remix loads for the very first time 
-ii. A new workspace is created with 'Default' template
-iii. There are no files existing in the File Explorer
+2. Реалізуйте контракт для управління списком задач:
+   - Додайте задачі (рядки).
+   - Видаляйте задачі.
+   - Зчитуйте всі задачі.
+   Використовуйте масив для зберігання задач.
 
-This workspace contains 3 directories:
+3. Створіть контракт, який дозволяє додавати товари (структура з полями назва, ціна).
+   - Реалізуйте функцію додавання товару.
+   - Зробіть функцію для покупки товару з перевіркою балансу на рахунку покупця (використовуйте змінну `msg.value`).
+   - Додайте можливість отримати список усіх доступних товарів.
 
-1. 'contracts': Holds three contracts with increasing levels of complexity.
-2. 'scripts': Contains four typescript files to deploy a contract. It is explained below.
-3. 'tests': Contains one Solidity test file for 'Ballot' contract & one JS test file for 'Storage' contract.
+4. Реалізуйте просту систему голосування:
+   - Створіть масив або структуру для кандидатів (наприклад, імена).
+   - Додайте функцію, що дозволяє голосувати за кандидата.
+   - Зробіть функцію для перегляду результатів голосування.
 
-SCRIPTS
+5. Реалізуйте контракт, що підтримує систему підписок:
+   - Користувачі можуть сплачувати за доступ до послуги на визначений період.
+   - Реалізуйте функції перевірки активної підписки користувача.
+   - Додайте можливість адміністратору змінювати вартість підписки.
 
-The 'scripts' folder has two typescript files which help to deploy the 'Storage' contract using 'ethers.js' libraries.
+6. Реалізуйте контракт, який дозволяє спільноті голосувати за проекти для фінансування:
+   - Користувачі можуть пропонувати свої проекти з описом і необхідною сумою.
+   - Кожен користувач може голосувати за проект.
+   - Реалізуйте логіку розподілу коштів на основі голосів.
 
-For the deployment of any other contract, just update the contract name from 'Storage' to the desired contract and provide constructor arguments accordingly 
-in the file `deploy_with_ethers.ts`
-
-In the 'tests' folder there is a script containing Mocha-Chai unit tests for 'Storage' contract.
-
-To run a script, right click on file name in the file explorer and click 'Run'. Remember, Solidity file must already be compiled.
-Output from script will appear in remix terminal.
-
-Please note, require/import is supported in a limited manner for Remix supported modules.
-For now, modules supported by Remix are ethers, swarmgw, chai, multihashes, remix and hardhat only for hardhat.ethers object/plugin.
-For unsupported modules, an error like this will be thrown: '<module_name> module require is not supported by Remix IDE' will be shown.

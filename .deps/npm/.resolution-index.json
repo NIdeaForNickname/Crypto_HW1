@@ -1,0 +1,75 @@
+{
+  "contracts/1_Storage.sol": {
+    "__sources__": {
+      "contracts/1_Storage.sol": {
+        "content": "// SPDX-License-Identifier: GPL-3.0\n\npragma solidity >=0.8.2 <0.9.0;\n\n/**\n * @title Storage\n * @dev Store & retrieve value in a variable\n * @custom:dev-run-script ./scripts/deploy_with_ethers.ts\n */\ncontract Storage {\n\n    uint256 number;\n\n    /**\n     * @dev Store value in variable\n     * @param num value to store\n     */\n    function store(uint256 num) public {\n        number = num;\n    }\n\n    /**\n     * @dev Return value \n     * @return value of 'number'\n     */\n    function retrieve() public view returns (uint256){\n        return number;\n    }\n}",
+        "file": "contracts/1_Storage.sol"
+      }
+    }
+  },
+  "contracts/3_Ballot.sol": {
+    "__sources__": {
+      "contracts/3_Ballot.sol": {
+        "content": "// SPDX-License-Identifier: GPL-3.0\n\npragma solidity >=0.7.0 <0.9.0;\n\n/** \n * @title Ballot\n * @dev Implements voting process along with vote delegation\n */\ncontract Ballot {\n    // This declares a new complex type which will\n    // be used for variables later.\n    // It will represent a single voter.\n    struct Voter {\n        uint weight; // weight is accumulated by delegation\n        bool voted;  // if true, that person already voted\n        address delegate; // person delegated to\n        uint vote;   // index of the voted proposal\n    }\n\n    // This is a type for a single proposal.\n    struct Proposal {\n        // If you can limit the length to a certain number of bytes, \n        // always use one of bytes1 to bytes32 because they are much cheaper\n        bytes32 name;   // short name (up to 32 bytes)\n        uint voteCount; // number of accumulated votes\n    }\n\n    address public chairperson;\n\n    // This declares a state variable that\n    // stores a 'Voter' struct for each possible address.\n    mapping(address => Voter) public voters;\n\n    // A dynamically-sized array of 'Proposal' structs.\n    Proposal[] public proposals;\n\n    /** \n     * @dev Create a new ballot to choose one of 'proposalNames'.\n     * @param proposalNames names of proposals\n     */\n    constructor(bytes32[] memory proposalNames) {\n        chairperson = msg.sender;\n        voters[chairperson].weight = 1;\n\n        // For each of the provided proposal names,\n        // create a new proposal object and add it\n        // to the end of the array.\n        for (uint i = 0; i < proposalNames.length; i++) {\n            // 'Proposal({...})' creates a temporary\n            // Proposal object and 'proposals.push(...)'\n            // appends it to the end of 'proposals'.\n            proposals.push(Proposal({\n                name: proposalNames[i],\n                voteCount: 0\n            }));\n        }\n    }\n\n     /** \n     * @dev Give 'voter' the right to vote on this ballot. May only be called by 'chairperson'.\n     * @param voter address of voter\n     */\n    function giveRightToVote(address voter) external {\n        // If the first argument of `require` evaluates\n        // to 'false', execution terminates and all\n        // changes to the state and to Ether balances\n        // are reverted.\n        // This used to consume all gas in old EVM versions, but\n        // not anymore.\n        // It is often a good idea to use 'require' to check if\n        // functions are called correctly.\n        // As a second argument, you can also provide an\n        // explanation about what went wrong.\n        require(\n            msg.sender == chairperson,\n            \"Only chairperson can give right to vote.\"\n        );\n        require(\n            !voters[voter].voted,\n            \"The voter already voted.\"\n        );\n        require(voters[voter].weight == 0, \"Voter already has the right to vote.\");\n        voters[voter].weight = 1;\n    }\n\n    /**\n     * @dev Delegate your vote to the voter 'to'.\n     * @param to address to which vote is delegated\n     */\n    function delegate(address to) external {\n        // assigns reference\n        Voter storage sender = voters[msg.sender];\n        require(sender.weight != 0, \"You have no right to vote\");\n        require(!sender.voted, \"You already voted.\");\n\n        require(to != msg.sender, \"Self-delegation is disallowed.\");\n\n        // Forward the delegation as long as\n        // 'to' also delegated.\n        // In general, such loops are very dangerous,\n        // because if they run too long, they might\n        // need more gas than is available in a block.\n        // In this case, the delegation will not be executed,\n        // but in other situations, such loops might\n        // cause a contract to get \"stuck\" completely.\n        while (voters[to].delegate != address(0)) {\n            to = voters[to].delegate;\n\n            // We found a loop in the delegation, not allowed.\n            require(to != msg.sender, \"Found loop in delegation.\");\n        }\n\n        Voter storage delegate_ = voters[to];\n\n        // Voters cannot delegate to accounts that cannot vote.\n        require(delegate_.weight >= 1);\n\n        // Since 'sender' is a reference, this\n        // modifies 'voters[msg.sender]'.\n        sender.voted = true;\n        sender.delegate = to;\n\n        if (delegate_.voted) {\n            // If the delegate already voted,\n            // directly add to the number of votes\n            proposals[delegate_.vote].voteCount += sender.weight;\n        } else {\n            // If the delegate did not vote yet,\n            // add to her weight.\n            delegate_.weight += sender.weight;\n        }\n    }\n\n    /**\n     * @dev Give your vote (including votes delegated to you) to proposal 'proposals[proposal].name'.\n     * @param proposal index of proposal in the proposals array\n     */\n    function vote(uint proposal) external {\n        Voter storage sender = voters[msg.sender];\n        require(sender.weight != 0, \"Has no right to vote\");\n        require(!sender.voted, \"Already voted.\");\n        sender.voted = true;\n        sender.vote = proposal;\n\n        // If 'proposal' is out of the range of the array,\n        // this will throw automatically and revert all\n        // changes.\n        proposals[proposal].voteCount += sender.weight;\n    }\n\n    /** \n     * @dev Computes the winning proposal taking all previous votes into account.\n     * @return winningProposal_ index of winning proposal in the proposals array\n     */\n    function winningProposal() public view\n            returns (uint winningProposal_)\n    {\n        uint winningVoteCount = 0;\n        for (uint p = 0; p < proposals.length; p++) {\n            if (proposals[p].voteCount > winningVoteCount) {\n                winningVoteCount = proposals[p].voteCount;\n                winningProposal_ = p;\n            }\n        }\n    }\n\n    /** \n     * @dev Calls winningProposal() function to get the index of the winner contained in the proposals array and then\n     * @return winnerName_ the name of the winner\n     */\n    function winnerName() external view\n            returns (bytes32 winnerName_)\n    {\n        winnerName_ = proposals[winningProposal()].name;\n    }\n}",
+        "file": "contracts/3_Ballot.sol"
+      }
+    }
+  },
+  "Task1.sol": {
+    "__sources__": {}
+  },
+  "contracts/Task.4.sol": {
+    "__sources__": {}
+  },
+  "contracts/Taks5.sol": {
+    "__sources__": {}
+  },
+  "contracts/Task1.sol": {
+    "__sources__": {
+      "contracts/Task1.sol": {
+        "content": "pragma solidity ^0.8.0;\n\ncontract Counter {\n    uint256 private count;\n\n    function increment() public {\n        count += 1;\n    }\n\n    function decrement() public {\n        require(count > 0, \"counter must be positive\");\n        count -= 1;\n    }\n\n    function getCount() public view returns (uint256) {\n        return count;\n    }\n}\n",
+        "file": "contracts/Task1.sol"
+      }
+    }
+  },
+  "contracts/Task6.sol": {
+    "__sources__": {
+      "contracts/Task6.sol": {
+        "content": "pragma solidity ^0.8.0;\n\ncontract CommunityFunding {\n    struct Project {\n        address payable proposer;\n        string description;\n        uint256 requiredFunds;\n        uint256 votes;\n        bool funded;\n    }\n\n    Project[] public projects;\n    uint256 public requiredVotesToPass = 3; \n\n    mapping(uint256 => mapping(address => bool)) public hasVoted;\n\n    function depositToPool() public payable {}\n\n    function proposeProject(string memory _description, uint256 _requiredFunds) public {\n        projects.push(Project({\n            proposer: payable(msg.sender),\n            description: _description,\n            requiredFunds: _requiredFunds,\n            votes: 0,\n            funded: false\n        }));\n    }\n\n    function voteForProject(uint256 _projectIndex) public {\n        require(_projectIndex < projects.length, \"Project does not exist\");\n        require(!hasVoted[_projectIndex][msg.sender], \"You already voted for this project\");\n        \n        Project storage project = projects[_projectIndex];\n        require(!project.funded, \"Project already funded\");\n\n        project.votes += 1;\n        hasVoted[_projectIndex][msg.sender] = true;\n\n        if (project.votes >= requiredVotesToPass) {\n            require(address(this).balance >= project.requiredFunds, \"Not enough money in the pool\");\n            \n            project.funded = true;\n            project.proposer.transfer(project.requiredFunds);\n        }\n    }\n\n    function getProjectsCount() public view returns (uint256) {\n        return projects.length;\n    }\n}",
+        "file": "contracts/Task6.sol"
+      }
+    }
+  },
+  "contracts/Task4.sol": {
+    "__sources__": {
+      "contracts/Task4.sol": {
+        "content": "pragma solidity ^0.8.0;\n\ncontract Voting {\n    struct Candidate {\n        string name;\n        uint256 voteCount;\n    }\n\n    Candidate[] public candidates;\n    mapping(address => bool) public hasVoted;\n\n    constructor(string[] memory _names) {\n        for (uint256 i = 0; i < _names.length; i++) {\n            candidates.push(Candidate(_names[i], 0));\n        }\n    }\n\n    function vote(uint256 _candidateIndex) public {\n        require(!hasVoted[msg.sender], \"you have already voted\");\n        require(_candidateIndex < candidates.length, \"invalid candidate\");\n\n        candidates[_candidateIndex].voteCount += 1;\n        hasVoted[msg.sender] = true;\n    }\n\n    function getResults() public view returns (Candidate[] memory) {\n        return candidates;\n    }\n}",
+        "file": "contracts/Task4.sol"
+      }
+    }
+  },
+  "contracts/Task5.sol": {
+    "__sources__": {
+      "contracts/Task5.sol": {
+        "content": "pragma solidity ^0.8.0;\n\ncontract SubscriptionSystem {\n    address public admin;\n    uint256 public subscriptionPrice;\n    uint256 public duration = 30 days; \n\n    mapping(address => uint256) public subscriptionExpiresAt;\n\n    constructor(uint256 _initialPrice) {\n        admin = msg.sender;\n        subscriptionPrice = _initialPrice;\n    }\n\n    modifier onlyAdmin() {\n        require(msg.sender == admin, \"permission denied\");\n        _;\n    }\n\n    function buySubscription() public payable {\n        require(msg.value == subscriptionPrice, \"incorrect payment amount\");\n        \n        if (subscriptionExpiresAt[msg.sender] < block.timestamp) {\n            subscriptionExpiresAt[msg.sender] = block.timestamp + duration;\n        } else {\n            subscriptionExpiresAt[msg.sender] += duration;\n        }\n    }\n\n    function isSubscriptionActive(address _user) public view returns (bool) {\n        return subscriptionExpiresAt[_user] > block.timestamp;\n    }\n\n    function updatePrice(uint256 _newPrice) public onlyAdmin {\n        subscriptionPrice = _newPrice;\n    }\n\n    function withdraw() public onlyAdmin {\n        payable(admin).transfer(address(this).balance);\n    }\n}",
+        "file": "contracts/Task5.sol"
+      }
+    }
+  },
+  "contracts/Task2.sol": {
+    "__sources__": {
+      "contracts/Task2.sol": {
+        "content": "pragma solidity ^0.8.0;\n\ncontract TodoList {\n    string[] private tasks;\n\n    function addTask(string memory _task) public {\n        tasks.push(_task);\n    }\n\n    function deleteTask(uint256 _index) public {\n        require(_index < tasks.length, \"out of bounds\");\n        \n        tasks[_index] = tasks[tasks.length - 1];\n        tasks.pop();\n    }\n\n    function getTasks() public view returns (string[] memory) {\n        return tasks;\n    }\n}",
+        "file": "contracts/Task2.sol"
+      }
+    }
+  },
+  "contracts/Task3.sol": {
+    "__sources__": {
+      "contracts/Task3.sol": {
+        "content": "pragma solidity ^0.8.0;\n\ncontract SimpleShop {\n    struct Item {\n        string name;\n        uint256 price;\n        bool isAvailable;\n    }\n\n    Item[] public items;\n    address public owner;\n\n    constructor() {\n        owner = msg.sender;\n    }\n\n    function addItem(string memory _name, uint256 _price) public {\n        items.push(Item(_name, _price, true));\n    }\n\n    function buyItem(uint256 _index) public payable {\n        require(_index < items.length, \"Item does not exist\");\n        Item storage item = items[_index];\n        \n        require(item.isAvailable, \"Item unavailable\");\n        require(msg.value >= item.price, \"incorrect payment amount\");\n\n        item.isAvailable = false;\n        \n        payable(owner).transfer(msg.value);\n    }\n\n    function getAllItems() public view returns (Item[] memory) {\n        return items;\n    }\n}",
+        "file": "contracts/Task3.sol"
+      }
+    }
+  }
+}
